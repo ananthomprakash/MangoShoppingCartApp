@@ -17,6 +17,8 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("ApiSett
 //regsitering auth service
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+builder.Services.AddScoped<IJWTTokenGenerator, JwtTokenGenerator>();
+
 //adding .net identity and creating bridge between .net identity and ef core
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>()
