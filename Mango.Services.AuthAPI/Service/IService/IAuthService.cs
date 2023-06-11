@@ -8,5 +8,7 @@ namespace Mango.Services.AuthAPI.Service.IService
 
         Task<LoginResonseDto> Login(LoginRequestDto loginRequestDto);
 
+        Task<bool> AssignRole(string email, string roleName);
+
     }
 }
