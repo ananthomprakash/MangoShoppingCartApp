@@ -24,6 +24,24 @@ namespace Mango.Services.AuthAPI.Service
             _roleManager = roleManager;
             _jwtTokenGenerator = jWTTokenGenerator;
         }
+
+        public async Task<bool> AssignRole(string email, string roleName)
+        {
+            var user= _db.ApplicationUsers.FirstOrDefault(u=>u.UserName.ToLower() == email.ToLower());
+            if(user != null)
+            {
+                if (!_roleManager.RoleExistsAsync(roleName).GetAwaiter().GetResult())
+                {
+                    //create role if it does not exist
+                    _roleManager.CreateAsync(new IdentityRole(roleName)).GetAwaiter().GetResult();
+                }
+                await _userManager.AddToRoleAsync(user, roleName);
+                return true;
+            }
+            return false;
+        }
+
+
         public async Task<LoginResonseDto> Login(LoginRequestDto loginRequestDto)
         {
             var user = _db.ApplicationUsers.FirstOrDefault(u => 
@@ -36,7 +54,9 @@ namespace Mango.Services.AuthAPI.Service
             }
             //if the user is found we need to generate the token
             //we want to generate the token for the logged in user
-           var token= _jwtTokenGenerator.GenerateToken(user);
+
+            var roles = await _userManager.GetRolesAsync(user);
+           var token= _jwtTokenGenerator.GenerateToken(user,roles);
 
             UserDto userDto = new()
             {
