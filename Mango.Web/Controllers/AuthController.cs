@@ -1,9 +1,13 @@
 ﻿using Mango.Web.Models;
 using Mango.Web.Service.IService;
 using Mango.Web.Utility;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Newtonsoft.Json;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace Mango.Web.Controllers
 {
@@ -12,9 +16,12 @@ namespace Mango.Web.Controllers
 
         private readonly IAuthService _authService;
 
-        public AuthController(IAuthService authService)
+        private readonly ITokenProvider _tokenProvider;
+
+        public AuthController(IAuthService authService, ITokenProvider tokenProvider)
         {
             _authService = authService;
+            _tokenProvider = tokenProvider;
         }
 
         [HttpGet]
@@ -34,6 +41,10 @@ namespace Mango.Web.Controllers
             if (responseDto != null && responseDto.IsSuccess)
             {
                 LoginResonseDto loginResonseDto = JsonConvert.DeserializeObject<LoginResonseDto>(Convert.ToString(responseDto.Result));
+
+                await SignInUser(loginResonseDto);
+                _tokenProvider.SetToken(loginResonseDto.Token);
+
                 return RedirectToAction("Index", "Home");
 
             }
@@ -79,6 +90,10 @@ namespace Mango.Web.Controllers
                 }
 
             }
+            else
+            {
+                TempData["error"] = result.Message;
+            }
             var roleList = new List<SelectListItem>()
             {
                 new SelectListItem{Text=SD.RoleAdmin, Value=SD.RoleAdmin},
@@ -92,11 +107,45 @@ namespace Mango.Web.Controllers
         }
 
 
-
-        public IActionResult Logout()
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public async Task<IActionResult> Logout()
         {
-            return View();
+            await HttpContext.SignOutAsync();
+            _tokenProvider.ClearToken();
+            return RedirectToAction("Index", "Home");
 
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="loginResonseDto"></param>
+        /// <returns></returns>
+        private async Task SignInUser(LoginResonseDto loginResonseDto)
+        {
+
+            var handler = new JwtSecurityTokenHandler();
+            var jwt = handler.ReadJwtToken(loginResonseDto.Token);
+            var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme);
+            identity.AddClaim(new Claim(JwtRegisteredClaimNames.Email,
+                jwt.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Email).Value));
+            identity.AddClaim(new Claim(JwtRegisteredClaimNames.Sub,
+                jwt.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Sub).Value));
+            identity.AddClaim(new Claim(JwtRegisteredClaimNames.Name,
+                jwt.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Name).Value));
+
+            identity.AddClaim(new Claim(ClaimTypes.Name,
+                jwt.Claims.FirstOrDefault(x => x.Type == JwtRegisteredClaimNames.Email).Value));
+
+            identity.AddClaim(new Claim(ClaimTypes.Role,
+                jwt.Claims.FirstOrDefault(x => x.Type == "role").Value));
+
+            var principal = new ClaimsPrincipal(identity);
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
         }
 
     }
